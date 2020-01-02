@@ -1,0 +1,10 @@
+<?php
+function handleRequest() {
+  session_start();
+  if (! isset($_SESSION['startTime'])) {
+    echo 'ERROR! No start time saved.';
+  } else {
+    $_SESSION['totalTime'] = time() - $_SESSION['startTime'];
+  }
+}
+handleRequest();

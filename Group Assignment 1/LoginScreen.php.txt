@@ -1,0 +1,199 @@
+<!--Start the session-->
+<?php session_start() ?>
+
+
+<html>
+	<head>
+		<!-- Script source for hashing -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.min.js" integrity="sha256-u6BamZiW5tCemje2nrteKC2KoLIKX9lKPSpvCkOhamw=" crossorigin="anonymous"></script>
+		<link rel="stylesheet" href="styles.css"></style>
+	</head>
+	
+	<body>
+		<?php
+			// Boolean variable to mark when the user has provided a valid username and password
+			$_SESSION["validData"] = False;
+			
+			// service side code
+			$servername = "sql211.epizy.com";
+			$username = "epiz_23878166";
+			$password = "mm2OVpxtfruY";
+			$dbname = "epiz_23878166_3750Barker";		
+			
+			// Logic to determine which button the user pressed and which function to execute
+			if (isset($_POST['decision']) && $_POST['decision'] == "create")
+			{
+				CreateUser();
+			}
+			
+			if (isset($_POST['decision']) && $_POST['decision'] == "login")
+			{
+				LoginUser();
+			}
+			
+			if (isset($_POST['decision']) && $_POST['decision'] == "logout")
+			{
+				session_destroy();
+			}
+			
+			
+			// Function to create a new user and password then enter them into the database
+			function CreateUser()
+			{
+				global $servername, $username, $password, $dbname;
+				
+				// Instantiate the session variables for username and password
+				$_SESSION["userName"] = $_POST['userName'];
+				$_SESSION["password"] = $_POST['hashPassword'];
+				
+				// Hash and salt the password on the server side
+				$salt = "2019CS3750SaltMike";
+				$_SESSION["password"] = hash(gost, $_SESSION["password"].$salt);
+				$_SESSION["password"] = sha1($_SESSION["password"]);
+				$_SESSION["password"] = hash(gost, $_SESSION["password"]);
+				
+				// Create connection
+				$conn = new mysqli($servername, $username, $password, $dbname);
+				// Check connection
+				if($conn->connect_error){
+					die("Connection failed: " . $conn->connect_error);
+				}
+				
+				// SQL query to check database for the entered username
+				$sql = "SELECT * FROM Users WHERE Username = '{$_SESSION['userName']}'";
+				$result = $conn->query($sql) or die($conn->error);
+				
+				// Check if the returned query for the username
+				if($result->num_rows >= 1)
+				{
+					echo "Username already exists. Try another name.";
+				}
+				// If the username isn't in the database, enter the user inputted name and password
+				else
+				{
+					$sql1 = "INSERT INTO Users (UserName, Password) VALUES ('{$_SESSION["userName"]}', '{$_SESSION["password"]}')";
+					$result = $conn->query($sql1);
+					
+					// Set the boolean to true for valid user input
+					$_SESSION["validData"] = True;
+				}
+			}
+			
+			// Function to check the user inputted name and password with the database values
+			function LoginUser()
+			{
+				global $servername, $username, $password, $dbname;
+				
+				// Instantiate the session username and password
+				$_SESSION["userName"] = $_POST['userName'];
+				$_SESSION["password"] = $_POST['hashPassword'];
+				
+				// Salt and hash the password on the server side
+				$salt = "2019CS3750SaltMike";
+				$_SESSION["password"] = hash(gost, $_SESSION["password"].$salt);
+				$_SESSION["password"] = sha1($_SESSION["password"]);
+				$_SESSION["password"] = hash(gost, $_SESSION["password"]);
+				
+				// Create connection
+				$conn = new mysqli($servername, $username, $password, $dbname);
+				// Check connection
+				if($conn->connect_error){
+					die("Connection failed: " . $conn->connect_error);
+				}
+				
+				// SQL query to check the database for the username
+				$sql = "SELECT * FROM Users WHERE Username = '{$_SESSION['userName']}'";
+				$result = $conn->query($sql) or die($conn->error);
+				$row = $result->fetch_assoc();
+				
+				// Compare the username entered by the user with the username in the database
+				if($row['UserName'] == $_SESSION["userName"])
+				{				
+					// Compare the password entered by the user with the password in the database
+					if($row['Password'] == $_SESSION["password"])
+					{
+						echo "Login Successful";
+						$_SESSION["validData"] = True;
+					}
+					else
+					{
+						echo "Login Unsuccessful: Invalid Password";
+					}
+				}
+				else{
+					echo "Login Unsuccessful: Invalid Username";
+				}
+			}
+		?>
+		
+		<!--Initial form visible to the user for data entry-->
+		<?php if(!$_SESSION["validData"]) : ?>
+		<div id="main">
+			<form action="/LoginScreen.php" target="_self" method="POST" id="loginForm">
+				User Name: <input type="text" name="userName" required="True">
+				Password: <input type="text" name="password" required="True" id="password"><br>
+				
+				<input type="button" value="Create New User" name="newUser" id="newUser">
+				<input type="button" value="Existing User/Login" name="existingUser" id="login">
+				<input type="hidden" id="hidden" name="hashPassword" value="">
+				<input type="hidden" id="decision" name="decision" value="">
+			</form>
+		</div>
+		<?php endif;?>
+		
+		<!--This form will post when all data has been validated and the user can select to play the game-->
+		<?php if($_SESSION["validData"]) : ?>
+		<form action="/Minesweeper.php" target="_self" method="POST">
+			Hello <?php echo $_SESSION["userName"]?><br>
+			Lets play some Minesweeper!<br>
+			<input type="hidden" name="token" value="<?php echo uniqid(); ?>" />
+			<input type="submit" value="Play Minesweeper" name="minesweeper">
+			<input type="hidden" id="decision" name="decision" value="">
+		</form>
+		<?php endif;?>
+		
+		<!--Display the button to show the user the high scores webpage-->
+		<form action="/ScorePage.php" target="_self" method="POST">
+			<input type="submit" value="High Scores" name="highScores">
+		</form>
+		
+		<!--Javascript functions to handle the hashing functions and submitting the pages-->
+		<?php if(!$_SESSION["validData"]) : ?>
+	    <script type="text/javascript">
+			var hash = function(event)
+			{
+				event.preventDefault();
+				console.log(event, this);
+				
+				var encrypted = CryptoJS.SHA256(document.getElementById('password').value).toString();
+				document.getElementById("hidden").value = encrypted;
+				document.getElementById("decision").value = "create";
+				document.getElementById("loginForm").submit();
+			}
+			
+			var hash2 = function(event)
+			{
+				event.preventDefault();
+				console.log(event, this);
+				
+				var encrypted = CryptoJS.SHA256(document.getElementById('password').value).toString();
+				document.getElementById("hidden").value = encrypted;
+				document.getElementById("decision").value = "login";
+				document.getElementById("loginForm").submit();
+			}
+			
+			var logoutUser = function(event)
+			{
+				event.preventDefault();
+				console.log(event, this);
+				
+				document.getElementById("decision").value = "logout";
+				document.getElementById("minesweeper").submit();
+			}
+			document.getElementById('newUser').addEventListener('click', hash);
+			document.getElementById('login').addEventListener('click', hash2);
+			
+		</script> 
+		<?php endif;?>
+	</body>
+</html>

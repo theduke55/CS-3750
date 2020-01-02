@@ -1,0 +1,6 @@
+<script> 
+  function mySubmit() {
+     document.getElementById('hiddenField').value = "Whatever I want here";
+     document.getElementById("myForm").submit();
+   }
+</script>

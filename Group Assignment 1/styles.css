@@ -1,0 +1,84 @@
+body {
+  color: white;
+  background-color: #761b7d;
+  font-family: Verdana, Arial, Helvetica, sans-serif;
+}
+#mainDiv {
+  background-color: lightgrey;
+  width: 315px;
+  height: 308px;
+  border: 15px solid green;
+}
+#topDiv {
+  background-color: lightgrey;
+  width: 315px;
+  height: 115px;
+  border: 15px solid green;
+}
+
+#flagCount {
+  background-color: black;
+  width: 120px;
+  height: 107px;
+  border: 5px solid red;
+  color: red;
+  text-align: center;
+  vertical-align: text-top;
+  float: left;
+}
+
+#won
+{
+  color: green;
+  float: left;
+  margin-left: 7px;
+}
+#lost
+{
+  color: red;
+  float: left;
+  margin-left: 7px;
+}
+#timer {
+  background-color: black;
+  width: 120px;
+  height: 107px;
+  border: 5px solid red;
+  color: white;
+  font-size: 20px;
+  text-align: center;
+
+  float: right;
+}
+
+#flips {
+  background-color: green;
+}
+
+#flips.flaggingOn {
+  background-color: red;
+}
+
+.mineButton {
+  background-color: white;
+  width: 34.6px;
+  height: 34.6px;
+  border: 1px solid black;
+  margin-left: 0.2px;
+  margin-right: 0.2px;
+  margin-bottom: 0.2px;
+  margin-top: 0.2px;
+  float: top;
+  float: left;
+}
+#Login
+{
+  background-color: orange;
+  color: white;
+  margin-left: 140px;
+}
+#thearea
+{
+	height:500px;
+	width: 300px;	
+}

@@ -1,0 +1,19 @@
+<?php
+function handleRequest() {
+  session_start();
+  // If a total time has already been saved (meaning the game is over),
+  // then return the total time that has been saved.
+  if (isset($_SESSION['totalTime'])) {
+    echo $_SESSION['totalTime'];
+    exit();
+  }
+  
+  // OK, no total time has been saved, so that should mean we are
+  // currently in a game.
+  if (! isset($_SESSION['startTime'])) {
+    echo "ERROR! No start time saved.";
+  } else {
+    echo time() - $_SESSION['startTime']; 
+  }
+}
+handleRequest();

@@ -1,0 +1,34 @@
+<?php
+	session_start();
+?>
+<html>
+	<body>
+		<p>
+		<?php
+			
+			function getHash(){
+				$password = (string)$_POST["sha256"];
+				$salt = "2019CS3750SaltMike";
+				$_SESSION["hash"] = hash(gost, $password.$salt);
+				$_SESSION["hash"] = sha1($_SESSION["hash"]);
+				$_SESSION["hash"] = hash(gost, $_SESSION["hash"]);
+				echo "<script> location.href='shaResults.php'; </script>";
+			    exit;
+			}
+				
+			if(isset($_POST['submit'])){
+			   getHash();
+			} 
+		
+		?>
+		<form action="shaTest.php" method="post">
+
+			Enter your password: <input type="text" name="sha256" /><br><br>
+
+
+			<button type="submit" name="submit">Submit</>
+
+		</form>
+		</p>
+	</body>
+</html>

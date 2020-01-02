@@ -1,0 +1,60 @@
+<html>
+<head>
+<title>Score Page</title>
+</head> 
+<link rel="stylesheet" href="styles.css"></style>
+
+<textarea id="thearea" >
+<?php
+//service side code (clint should not see)
+//$id =  "<script language='javascript'> document.writeln(name1);</script>";
+//if($showHighScores)
+    $servername = "sql213.epizy.com";
+    $theusername = "epiz_23868847";
+    $password = "tPQpZvN8DZIGKqi";
+    $dbname = "epiz_23868847_highScores"; 
+    //now we creat the connection 
+    $conn = new mysqli($servername, $theusername, $password, $dbname);
+    //check connection 
+    if($conn -> connect_error)
+    {
+    die("connection failed:" . $conn -> connect_error);
+    }
+    echo "\n" ."Name  ?? " . "     Score". "\n";
+    echo "|---------------------------|" . "\n";
+    //disply all
+    $sql = "SELECT   name , scoreTime FROM theHighScores  ORDER BY scoreTime ASC " ;
+    $result = $conn -> query($sql);
+    if($result -> num_rows > 0)
+    {
+        while($row = $result->fetch_assoc())
+        {
+            //echo "the number of plays = ". $row["thecount"] . "<br>". "<br>"; 
+            //echo "------------------------------------------". "<br>";
+            echo  $row["name"] . " " . $row["scoreTime"] . "\n"; 
+            
+        }
+    }
+    else
+    {
+        echo "Got nothing";
+    }
+    $conn->close();
+    //testing to see what number is the user attempt in the table 
+   
+//}
+?>
+
+</textarea>
+
+
+<body>
+
+
+        <form action="/LoginScreen.php">
+        <input type="submit" value="Login Page" name="toLogin">
+        </form>
+
+
+</body>
+</html>

@@ -1,0 +1,401 @@
+<?php
+session_start();
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+// If this debug constant is set to a number, then the game will
+// hide that percentage of the cells (instead of all of them), as
+// if the game has already been partially played when you start. 
+// This makes it easier to get through testing without having to play
+// through the whole game over and over.
+//
+// If it is set to null, the game will behave normally.
+const BOARD_WIDTH = 9;
+const BOARD_HEIGHT = 9;
+const BOARD_TOTAL_CELLS = BOARD_WIDTH * BOARD_HEIGHT;
+const NUM_MINES = 10;
+// These represent all of the 8 possible directions that a neighbor mine could be
+// relative to a gievn cell. (Up and to the left, straight up, up and to the right, etc.)
+// When it's time to count the mines around a cell we go through each of these offsets
+// and check to see if a mine is there.
+const ADJACENT_CELL_OFFSETS = [
+    [-1, -1], [0, -1], [1, -1],
+    [-1,  0],          [1,  0],
+    [-1,  1], [0,  1], [1,  1]
+];
+//echo $_SESSION["userName"];
+/**
+ * Takes a percentage 0-100, and reveals that percentage
+ * of cells to simulate a game that has already been partially
+ * played. Used for debugging.
+ */
+ function debugReveal($percentage) {
+  // Copy existing board out of session.
+  $board = $_SESSION['board'];
+  // Overwrite some of the cells.
+  $revealedCellCount = 0;
+  $numToReveal = (int)(BOARD_TOTAL_CELLS * ($percentage / 100));
+  for ($i = 0; $i < $numToReveal; $i++) {
+    while ($revealedCellCount < $numToReveal) {
+      $y = rand(0, BOARD_HEIGHT - 1);
+      $x = rand(0, BOARD_WIDTH - 1);
+  
+      // If this cell doesn't have a mine and it isn't revealed already,
+      // then reveal it. If it is revealed already, then the loop will go
+      //  around again until we're done revealing.
+      if (! $board[$y][$x]['hasMine'] && ! $board[$y][$x]['revealed']) {
+        $board[$y][$x]['revealed'] = true;
+        $revealedCellCount++; 
+      }
+    }  
+  }
+  return $board;
+ }
+ 
+/**
+ * Takes a board as an argument, returns true/false whether the player won.
+ * 
+ * "Win" means the user has revealed every empty normal cell.
+ */
+function isGameWon($board) {
+  // Count up the empty cells, and if they have revealed the total
+  // number of cells -- minus the number that are filled with mines -- then
+  // we know that they have won.
+  $revealedCellCount = 0;
+  foreach ($board as $row) {
+    foreach ($row as $cell) {
+      if($cell['revealed']) {
+        $revealedCellCount++;
+      }
+    }
+  }
+  
+  return $revealedCellCount >= BOARD_TOTAL_CELLS - NUM_MINES;
+}
+/*
+ * Takes a cell as an argument, returns true/false if the player lost.
+ * 
+ * This only takes a cell instead of a whole board, because we only
+ * need to check the one cell that the player just clicked.
+ */
+function isGameLost($cell) {
+  return $cell['hasMine'];
+}
+/**
+ * Generate the initial board array used at the start of a game. This data
+ * structure is the heart of the game. (See the "API documentation.md" file for
+ * info about how it's structured.)
+ */
+function generateNewBoard() {
+  // We'll do this in 3 passes:
+  //
+  // In the first pass, here we create create a "blank" board array
+  // with the correct structure (NUM_MINES rows, and each row has NUM_MINES
+  // cells) and some of the values filled in. We will do 2 more passes to
+  // complete the board.
+  //
+  // For every cell, we initialize the "flagged" and "revealed" keys to
+  // false, and they will stay that way until the user starts to interact
+  // with the game.  We initialize the "hasMine" keys to false, but this
+  // will be overridden in the second pass (see below).
+  //
+  // In the second pass, we will "plant" the mines. We randomly flip NUM_MINES
+  // of the mines to true.
+  //
+  // In the third and final pass, we will iterate through the grid array and
+  // for all cells neighboring mines, we will add a "neighborMineCount" key to
+  // mark the number of mines neighboring the cell.
+  // First pass: fill the board with "blank" version
+  $board = [];
+  for ($y = 0; $y < BOARD_HEIGHT; $y++) {
+    $row = [];
+    for ($x = 0; $x < BOARD_WIDTH; $x++) {
+      $cell = [];
+      $cell['flagged'] = false;
+      $cell['revealed'] = false;
+      $cell['hasMine'] = false;  // Will be overridden in next pass
+       
+      $row[] = $cell;  // Add cell to end of row
+    }
+    $board[] = $row;  // Add row to end of board
+  }
+  
+  
+  // Second pass: insert 10 mines in random locations
+  $placedMineCount = 0;
+  while ($placedMineCount < NUM_MINES) {
+    $y = rand(0, BOARD_HEIGHT - 1);
+    $x = rand(0, BOARD_WIDTH - 1);
+    // If this cell doesn't have a mine already, then plant one.
+    // If it does, the loop will go around again until we have
+    // NUM_MINES mines.
+    if (! $board[$y][$x]['hasMine']) {
+      $board[$y][$x]['hasMine'] = true;
+      $placedMineCount++; 
+    }
+  }
+  
+  // Third pass: insert neighbor mine counts.
+  for ($y = 0; $y < BOARD_HEIGHT; $y++) {
+    for ($x = 0; $x < BOARD_WIDTH; $x++) {
+      $neighborMineCount = 0;
+      if ($cell['hasMine']) {
+        continue;
+      }
+      // Loop through all of the 8 possible offsets of a neighboring cell (up
+      // and to the left, straight up, up and to the right etc.) For each
+      // neighboring cell, we check for a mine in that position, and if there
+      // is one there, we bump the neighbor mine count for for the current
+      // cell.
+      foreach (ADJACENT_CELL_OFFSETS as list($xOffset, $yOffset)) {
+        // Apply the offset to get the coordinates of the neighboring cell.
+        // (Note that the offset can be negative, such as x = -1 and y = -1,
+        // which would be up and to the left.)
+        $neighborCellX = $x + $xOffset;
+        $neighborCellY = $y + $yOffset;
+ 
+        // If the y or y coordinate is off the edge of the grid, don't try to check
+        // for a mine.
+        if (($neighborCellX < 0 || $neighborCellX > BOARD_WIDTH - 1)
+            || $neighborCellY < 0 || $neighborCellY > BOARD_HEIGHT - 1) {
+          continue;
+        }
+        // If a mine exists at this position, then bump the counter.
+        if ($board[$neighborCellY][$neighborCellX]['hasMine']) {
+          $neighborMineCount++;
+        }
+      }
+      
+      // Done counting neighbors for this cell, so add our tally
+      // as a new key on the cell!
+      $board[$y][$x]['neighborMineCount'] = $neighborMineCount;
+    }
+  }
+  return $board;
+}
+/**
+ * Sets up a new game in the session from scratch, including generating a new board
+ * and saving all needed state into the session.
+ * 
+ * The user doesn't start *playing* the game until they make the first move. The playing
+ * is set up in the function startPlaying()
+ * 
+ * If you want to understand how a game is stored in the session, this is the first
+ * place to look.
+ */
+function startNewGame() {
+  $_SESSION['board'] = generateNewBoard();
+  // Reveal cells for debugging if requested
+  if (isset($_REQUEST['debugreveal'])) {
+    $_SESSION['board'] = debugReveal((int)$_REQUEST['debugreveal']);
+  }
+  $_SESSION['startTimestamp'] = null; // When the game starts, changes from null to the time the user started.
+  $_SESSION['gameStage'] = 'new';  // When the game starts, changes from "new" to "playing," and then later "won" or "lost" at the end of the game.
+  $_SESSION['finalTime'] = null;  // At the end of the game, changes from null to the final duration of the game
+}
+/**
+ * Starts the user playing the game.
+ */
+function startPlaying() {
+  $_SESSION['startTimestamp'] = time();
+  $_SESSION['gameStage'] = 'playing';
+}
+/**
+ * Records a game into the session as won.
+ * 
+ * Later on, code will probably be added here to also save high score
+ * information to the database.
+ */
+function recordGameWon() {
+  $_SESSION['gameStage'] = 'won';
+  $_SESSION['finalTime'] = time() - $_SESSION['startTimestamp'];
+  
+  $winTime = $_SESSION['finalTime'];
+  // *** HIGH SCORE STUFF GOES HERE! ***
+  //
+  // This is where you should put the code to save this new score to the "high
+  // scores" database table. This includes any additional related code, such as
+  // if you want to ignore scores that are too low to make the top 10, instead
+  // of saving them to the database.
+  $userName = $_SESSION['userName'];
+  //echo $userName;
+    $servername = "sql213.epizy.com";
+    $theusername = "epiz_23868847";
+    $password = "tPQpZvN8DZIGKqi";
+    $dbname = "epiz_23868847_highScores"; 
+    //now we creat the connection 
+    $conn = new mysqli($servername, $theusername, $password, $dbname);
+    //check connection 
+    if($conn -> connect_error)
+    {
+    die("connection failed:" . $conn -> connect_error);
+    }
+    //we insert here 
+    $sqli = "INSERT INTO theHighScores (name , scoreTime) VALUES ('$userName','  $winTime')";
+    mysqli_query($conn,$sqli);
+}
+function recordGameLost() {
+  $_SESSION['gameStage'] = 'lost';
+  $_SESSION['finalTime'] = time() - $_SESSION['startTimestamp'];
+}
+/**
+ * This function is used to take the board that we have stored internally, and convert
+ * it to an output array that will be sent to the client as a JSON array. See the top
+ * the "API Documentation: to find out more about the format.
+ * 
+ * Here we step through the stored array, one cell at a time, and convert it to
+ * the format that we want to output from the API. At the very end this will
+ * get sent down to the client as part of the response JSON.
+ */
+function buildResponseBoard($board) {
+  $outBoard = [];
+  for ($y = 0; $y < count($board); $y++) {  // Step through each row in the board...
+    $outRow = [];
+    for ($x = 0; $x < count($board); $x++) {  // Step through each cell in the row...
+      // Pull out the cell from this position in the board.
+      $origCell = $board[$y][$x];
+      // Initialize the cell that we are preparing to go into the output board.
+      // Over the next 10 lines or so we are going to fill it in with keys.
+      $outCell = [];
+      // The "x," "y," "revealed" and "flagged" keys are never hidden, so we just
+      // them straight along to the client every time.
+      $outCell['x'] = $x;
+      $outCell['y'] = $y;
+      $outCell['revealed'] = $origCell['revealed'];
+      $outCell['flagged'] = $origCell['flagged'];
+      // "neighborMineCount" and "hasMine" are included as well, but only
+      // if the cell has been revealed.
+      if ($origCell['revealed']) {
+        $outCell['neighborMineCount'] = $origCell['neighborMineCount'];
+        $outCell['hasMine'] = $origCell['hasMine'];  
+      }
+    
+      $outRow[] = $outCell; // All done building the cell, add it to the output row
+    }
+    $outBoard[] = $outRow;  // All done building the row, add it to the board 
+  }
+  
+  return $outBoard;
+}
+/**
+ * This is the function that sends the API response back to the client.
+ * See the "API documentation" file for a complete description
+ * of the format that this puts out.
+ * 
+ * $finalTime only needs to be passed in if the game is over; if the user
+ * is still playing, then you can pass in "null" for finalTime.
+ */
+function sendResponse($board, $gameStage, $startTimestamp, $finalTime) {
+  // If the game has started but the user hasn't started playing yet, then the
+  // time playing is sent down as 0.
+  //
+  // If the user is still playing, then the timer is actively running, so for the
+  // time playing we send down the current time minus the time that they started.
+  //
+  // If the game is over, then for the time playing we send down the final time
+  // that we recorded for them.
+  if ($gameStage === 'new') {
+    $timePlaying = 0;
+  } elseif ($gameStage === 'playing') {
+    $timePlaying = time() - $startTimestamp;
+  } else if ($gameStage === 'won' || $gameStage === 'lost') { 
+    assert('!is_null($finalTime)'); // $finalTime is required if the game is won or lost
+    $timePlaying = $finalTime;
+  } else {
+    echo 'ERROR: tried to return time, but the saved game stage is is not new, playing, won or lost.';
+    exit();
+  }
+  $out = [
+    'gameStage' => $gameStage,
+    'timePlaying' => $timePlaying,
+    'board' => buildResponseBoard($board)
+  ];
+  echo json_encode($out, JSON_PRETTY_PRINT);
+}
+/**
+ * When the user clicks a cell, the front end makes a request to this page,
+ * passing in the parameters "x" and "y" to indicate the cell the user clicked
+ * on. We make the move, save the data back into the session, and send the info
+ * about the info about the new board back to the client.
+ * If a "toggleflag" URL parameter is provided, then instead of a regular move, the
+ * "flagged" status of the cell will be flipped.
+ *
+ * If no "x" or "y" coordinates are provided at all, that means the client is
+ * just requesting the current board (not actually making a move).
+ */
+function handleRequest() {
+  //session_start();
+  // Make a new game if needed. This needs to happen in 3 scenarios:
+  //   - There is no existing game saved in the session. We check this by looking
+  //     to see if the "board" key has been saved to the session.
+  //   - The user has sent the parameter "newgame" in the request, which forces
+  //     us to make a new game even if another one already exists in the session.
+  //   - The user has signed in again since the last (we figure this out by checking
+  //     the tokenIsNew session key, which represents whether or not the login token
+  //     has just changed).
+  if (! isset($_SESSION['board']) || isset($_REQUEST['newgame']) || $_SESSION['tokenIsNew']) {
+    startNewGame();
+    // The tokenIsNew key is saved in Minesweeper.php to record when the user has
+    // signed in (meaning we received a request from the front page with a new login
+    // token). If we just started a new game because the token changed, then we need
+    // to flip tokenIsNew back to false -- otherwise we would just keep restarting
+    // the game over!
+    if ($_SESSION['tokenIsNew']) {
+      $_SESSION['tokenIsNew'] = false;
+    }
+  }
+  // First check if we received coordinates. If we don't have any, then the user doesn't
+  // want to move; they just want to get the current board. So we can immediately send back
+  // a response.
+  //
+  // Same goes for if the user is trying to make a move after they've already won or lost; we just
+  // ignore it and send back the board as-is.
+  if (! isset($_REQUEST['x']) || ! isset($_REQUEST['y']) || $_SESSION['gameStage'] === 'won' || $_SESSION['gameStage'] === 'lost') {
+    sendResponse($_SESSION['board'], $_SESSION['gameStage'], $_SESSION['startTimestamp'], $_SESSION['finalTime']);
+    return;
+  }
+  $x = (int)$_REQUEST['x'];
+  $y = (int)$_REQUEST['y'];
+  // We copy the board from the session into a variable called $board.
+  //
+  // Next we will update this variable to reflect the new changes, save back it to
+  // the session, and then send it out in our response to the user.
+  $board = $_SESSION['board'];
+  // If a "toggleflag" parameter is given, then we place a flag instead of doing
+  // a regular move.
+  if (isset($_REQUEST['toggleflag']) ) {
+    // Make a copy of the board from the session, toggle the flag in this cell on or off,
+    // and then save the new board back into the session.
+    $board[$y][$x]['flagged'] = ! $board[$y][$x]['flagged'];
+    $_SESSION['board'] = $board;
+    sendResponse($_SESSION['board'], $_SESSION['gameStage'], $_SESSION['startTimestamp'], $_SESSION['finalTime']);
+    return;
+  }
+  // OK, the user has provided x/y coordinates and they're not asking
+  // to toggle the flag, so it's time to play a move.
+  // If it's the first move, start the user playing
+  if ($_SESSION['gameStage'] === 'new') {
+    startPlaying();
+  }
+  // Mark the cell as revealed.
+  $board[$y][$x]['revealed'] = true;
+  // Yep, that was the whole thing! Now we need to determine the new stage of the
+  // game: lost, won or still playing?
+  //
+  // For each of these game stages, we will send a different type of
+  // response.
+  $clickedCell = $board[$y][$x];
+  if (isGameLost($clickedCell)) {
+    recordGameLost();
+    $newGameStage = 'lost';
+  } else if (isGameWon($board)) {
+    recordGameWon();
+    $newGameStage = 'won';
+  } else {
+    $newGameStage = 'playing';
+  }
+  // Save the updated board back into the session.
+  $_SESSION['board'] = $board;
+  // Send the response!
+  sendResponse($board, $newGameStage, $_SESSION['startTimestamp'], $_SESSION['finalTime']);
+}
+handleRequest();

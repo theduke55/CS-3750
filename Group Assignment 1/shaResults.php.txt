@@ -1,0 +1,13 @@
+<?php
+	session_start();
+?>
+<html>
+	<body>
+		<p>
+		<?php
+			echo $_SESSION["hash"];
+		
+		?>
+		</p>
+	</body>
+</html>
