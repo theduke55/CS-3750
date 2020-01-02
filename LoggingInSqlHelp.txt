@@ -1,0 +1,28 @@
+checking to see if a user exists:
+
+$sql=mysql_query("SELECT FROM users (username, password, email) WHERE username=$fusername");
+ if(mysql_num_rows($sql)>=1)
+   {
+    echo"name already exists";
+   }
+ else
+    {
+   //insert query goes here
+    }
+
+ADDING NEW USER: 
+
+INSERT INTO Users (UserID, Username Password) VALUES (NULL, ".$_SESSION["username"], $_SESSION["password"].")";
+
+LOGGING IN: 
+$userSql = "SELECT UserID FROM Users 
+WHERE UserName = ".$_SESSION["username"]." AND Password = ".$_SESSION["Password"];
+
+$_SESSION["UserID"] = conn->query($userSql);
+
+$timeSql = "SELECT HS.TimeScore 
+            FROM HighScores HS 
+            INNER JOIN Users U ON HS.UserID = U.UserID 
+            WHERE UserID = ".$_SESSION["UserID"];
+
+$_SESSION["Time"] = conn->query($timeSql);
